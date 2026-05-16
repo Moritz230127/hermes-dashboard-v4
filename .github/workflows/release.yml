@@ -89,7 +89,8 @@ jobs:
         if: matrix.pkg_ext == '.tar.gz'
         run: |
           PKG_NAME="dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}"
-          tar czf "$PKG_NAME" "dashboard-v4-${{ matrix.target }}"
+          cd "dashboard-v4-${{ matrix.target }}"
+          tar czf "../$PKG_NAME" .
 
       - name: Package (zip)
         if: matrix.pkg_ext == '.zip'
