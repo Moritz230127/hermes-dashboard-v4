@@ -63,14 +63,20 @@ if (-Not $Source) {
     Write-Head "下载预编译二进制"
 
     # 获取最新版本
-    $ver = if ($env:VERSION) { $env:VERSION } else {
+    if ($env:VERSION) {
+        $ver = $env:VERSION
+    } else {
         Write-Info "获取最新版本..."
         try {
-            $release = curl.exe -s "https://api.github.com/repos/$Repo/releases/latest"
-            ($release | ConvertFrom-Json).tag_name
+            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
+            $ver = $release.tag_name
         } catch {
-            Write-Err "无法获取版本号，请设置 VERSION 环境变量"
+            Write-Err "无法获取最新版本号（网络或代理问题），请设置 VERSION 环境变量手动指定版本。`n  示例:`n    `$env:VERSION = 'v4.0.0'; irm ... | iex"
         }
+    }
+
+    if ([string]::IsNullOrEmpty($ver)) {
+        Write-Err "版本号为空，无法继续。请设置 VERSION 环境变量"
     }
 
     $pkgName = "dashboard-v4-${arch}.zip"
@@ -81,7 +87,11 @@ if (-Not $Source) {
     New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
     Write-Info "下载: $url"
-    curl.exe -fsSL "$url" -o "$tmpDir\$pkgName"
+    try {
+        Invoke-WebRequest -Uri $url -OutFile "$tmpDir\$pkgName" -UseBasicParsing
+    } catch {
+        Write-Err "下载失败：$($_.Exception.Message)`n  URL: $url`n  检查：版本是否存在、网络/代理是否正常"
+    }
 
     Write-Info "解压..."
     Expand-Archive -Path "$tmpDir\$pkgName" -DestinationPath $tmpDir -Force
@@ -95,9 +105,11 @@ if (-Not $Source) {
     # 复制 dist/ 和 scripts/
     if (Test-Path "$tmpDir\dist") {
         Copy-Item "$tmpDir\dist\*" "$InstallDir\dist\" -Recurse -Force
+        Write-Info "静态文件 → $InstallDir\dist\"
     }
     if (Test-Path "$tmpDir\scripts") {
         Copy-Item "$tmpDir\scripts\*" "$InstallDir\scripts\" -Recurse -Force
+        Write-Info "脚本 → $InstallDir\scripts\"
     }
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 }
@@ -112,19 +124,21 @@ else {
 
     Write-Info "克隆仓库..."
     git clone --depth=1 "https://github.com/$Repo.git" $buildDir
+    if ($LASTEXITCODE -ne 0) { Write-Err "克隆仓库失败，请检查网络/代理" }
     Set-Location $buildDir
 
     Write-Info "构建 server (release)..."
     cargo build --release --package dashboard-server
+    if ($LASTEXITCODE -ne 0) { Write-Err "构建失败" }
     if (-Not (Test-Path "target\release\dashboard-server.exe")) {
-        Write-Err "构建失败"
+        Write-Err "构建完成但未找到 dashboard-server.exe"
     }
 
     Copy-Item "target\release\dashboard-server.exe" "$BinDir\dashboard-server.exe" -Force
     Write-Info "二进制 → $BinDir\dashboard-server.exe"
 
-    if (Test-Path "dist")  { Copy-Item "dist\*" "$InstallDir\dist\" -Recurse -Force }
-    if (Test-Path "scripts") { Copy-Item "scripts\*" "$InstallDir\scripts\" -Recurse -Force }
+    if (Test-Path "dist")     { Copy-Item "dist\*" "$InstallDir\dist\" -Recurse -Force }
+    if (Test-Path "scripts")  { Copy-Item "scripts\*" "$InstallDir\scripts\" -Recurse -Force }
     Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
 }
 
@@ -154,16 +168,16 @@ Write-Host ""
 if (Get-Command dashboard-server.exe -ErrorAction SilentlyContinue) {
     Write-Host "  dashboard-server.exe 已就绪" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  ${CYAN}启动命令:${NC}" -ForegroundColor Cyan
+    Write-Host "  启动命令:" -ForegroundColor Cyan
     Write-Host "    dashboard-server.exe"
     Write-Host ""
-    Write-Host "  ${CYAN}或双击:${NC}" -ForegroundColor Cyan
+    Write-Host "  或双击:" -ForegroundColor Cyan
     Write-Host "    $InstallDir\start.bat"
     Write-Host ""
-    Write-Host "  ${CYAN}浏览器访问:${NC}" -ForegroundColor Cyan
+    Write-Host "  浏览器访问:" -ForegroundColor Cyan
     Write-Host "    http://localhost:$Port"
     Write-Host ""
-    Write-Host "  ${CYAN}前置要求:${NC}" -ForegroundColor Cyan
+    Write-Host "  前置要求:" -ForegroundColor Cyan
     Write-Host "    确认 %USERPROFILE%\.hermes\usage.db 和 state.db 存在"
     Write-Host "    （由 Hermes Agent 自动生成）"
 } else {
