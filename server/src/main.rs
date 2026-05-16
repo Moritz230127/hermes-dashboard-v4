@@ -34,9 +34,17 @@ async fn main() {
     let host: String = std::env::var("HERMES_DASHBOARD_HOST")
         .unwrap_or_else(|_| "127.0.0.1".to_string());
 
-    let dist_path = std::env::current_dir()
-        .unwrap_or_default()
+    let dist_path = hermes_home
+        .join("dashboard-v4")
         .join("dist");
+    let dist_path = if dist_path.exists() {
+        dist_path
+    } else {
+        // fallback: 开发模式 / 从仓库根目录运行
+        std::env::current_dir()
+            .unwrap_or_default()
+            .join("dist")
+    };
 
     println!("Hermes API Dashboard V4 (Rust)");
     println!("  http://{}:{}", host, port);
