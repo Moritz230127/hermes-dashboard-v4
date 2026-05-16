@@ -1,0 +1,149 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v4.0.1)'
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            ext: ""
+            pkg_ext: .tar.gz
+            pkg_cmd: tar czf
+            separator: "/"
+
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            ext: ""
+            pkg_ext: .tar.gz
+            pkg_cmd: tar czf
+            separator: "/"
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            ext: ""
+            pkg_ext: .tar.gz
+            pkg_cmd: tar czf
+            separator: "/"
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            ext: .exe
+            pkg_ext: .zip
+            pkg_cmd: 7z a -tzip
+            separator: "\\"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation dependencies
+        if: runner.os == 'Linux' && matrix.target != 'x86_64-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build server (release)
+        run: cargo build --release --package dashboard-server --target ${{ matrix.target }}
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+
+      - name: Prepare package directory
+        shell: bash
+        run: |
+          PKG_DIR="dashboard-v4-${{ matrix.target }}"
+          mkdir -p "$PKG_DIR/scripts" "$PKG_DIR/dist"
+
+          # Binary
+          cp "target/${{ matrix.target }}/release/dashboard-server${{ matrix.ext }}" "$PKG_DIR/"
+
+          # Static files
+          cp dist/index.html "$PKG_DIR/dist/"
+
+          # Scripts
+          cp scripts/kill_session.py "$PKG_DIR/scripts/"
+          cp scripts/compress_session.py "$PKG_DIR/scripts/"
+
+          echo "Package contents:"
+          find "$PKG_DIR" -type f | sort
+
+      - name: Package (tar.gz)
+        if: matrix.pkg_ext == '.tar.gz'
+        run: |
+          PKG_NAME="dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}"
+          tar czf "$PKG_NAME" "dashboard-v4-${{ matrix.target }}"
+
+      - name: Package (zip)
+        if: matrix.pkg_ext == '.zip'
+        run: |
+          $pkg = "dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}"
+          7z a -tzip $pkg "dashboard-v4-${{ matrix.target }}\"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-v4-${{ matrix.target }}
+          path: dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}
+          retention-days: 90
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Hermes Dashboard V4 ${{ steps.version.outputs.tag }}"
+          body_path: .github/RELEASE_TEMPLATE.md
+          files: |
+            artifacts/dashboard-v4-x86_64-unknown-linux-gnu/dashboard-v4-x86_64-unknown-linux-gnu.tar.gz
+            artifacts/dashboard-v4-x86_64-apple-darwin/dashboard-v4-x86_64-apple-darwin.tar.gz
+            artifacts/dashboard-v4-aarch64-apple-darwin/dashboard-v4-aarch64-apple-darwin.tar.gz
+            artifacts/dashboard-v4-x86_64-pc-windows-msvc/dashboard-v4-x86_64-pc-windows-msvc.zip
+          generate_release_notes: true
