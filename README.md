@@ -52,6 +52,27 @@ curl -fsSL https://raw.githubusercontent.com/Moritz230127/hermes-dashboard-v4/ma
 
 安装后终端输入 `dashboard-server` 即可启动。
 
+### 安全卸载
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/Moritz230127/hermes-dashboard-v4/main/scripts/uninstall.sh | bash
+
+# 完全清除（包括 Hermes 数据库）
+curl -fsSL https://raw.githubusercontent.com/Moritz230127/hermes-dashboard-v4/main/scripts/uninstall.sh | bash -s -- --purge
+```
+
+```powershell
+# Windows (管理员 PowerShell)
+irm https://raw.githubusercontent.com/Moritz230127/hermes-dashboard-v4/main/scripts/uninstall.ps1 | iex
+
+# 完全清除
+irm ... | iex -Args "--purge"
+```
+
+> 卸载脚本会：停止进程 → 停用 systemd 服务 → 删除二进制 → 清理安装目录。
+> 默认**保留** Hermes 数据库 (`usage.db` / `state.db`)，加 `--purge` 一并清除。
+
 ---
 
 ## 📦 两种安装模式对比
@@ -165,6 +186,8 @@ hermes-dashboard-v4/
 ├── scripts/                # 运维脚本
 │   ├── install.sh          # Linux/macOS 安装
 │   ├── install.ps1         # Windows 安装
+│   ├── uninstall.sh        # Linux/macOS 安全卸载
+│   ├── uninstall.ps1       # Windows 安全卸载
 │   ├── kill_session.py     # 进程终止
 │   └── compress_session.py # 会话压缩
 └── .github/workflows/      # CI：三平台构建发布

@@ -79,6 +79,8 @@ jobs:
           cp scripts/compress_session.py "$PKG_DIR/scripts/"
           cp scripts/install.sh "$PKG_DIR/scripts/"
           cp scripts/install.ps1 "$PKG_DIR/scripts/"
+          cp scripts/uninstall.sh "$PKG_DIR/scripts/"
+          cp scripts/uninstall.ps1 "$PKG_DIR/scripts/"
 
           echo "Package contents:"
           find "$PKG_DIR" -type f | sort
