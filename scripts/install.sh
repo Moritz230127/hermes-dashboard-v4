@@ -134,8 +134,19 @@ install_binary() {
   fi
 
   # 复制 dist/ 和 scripts/
-  cp -r "$TMP_DIR/dist" "$INSTALL_DIR/" 2>/dev/null || warn "未找到 dist/ 目录"
-  cp -r "$TMP_DIR/scripts" "$INSTALL_DIR/" 2>/dev/null || warn "未找到 scripts/ 目录"
+  local dist_src scripts_src
+  dist_src=$(find "$TMP_DIR" -type d -name dist 2>/dev/null | head -1)
+  scripts_src=$(find "$TMP_DIR" -type d -name scripts 2>/dev/null | head -1)
+  if [[ -n "$dist_src" ]]; then
+    cp -r "$dist_src" "$INSTALL_DIR/" && info "静态文件 → $INSTALL_DIR/dist/"
+  else
+    warn "未找到 dist/ 目录"
+  fi
+  if [[ -n "$scripts_src" ]]; then
+    cp -r "$scripts_src" "$INSTALL_DIR/" && info "脚本 → $INSTALL_DIR/scripts/"
+  else
+    warn "未找到 scripts/ 目录"
+  fi
 }
 
 # ============================================================================
