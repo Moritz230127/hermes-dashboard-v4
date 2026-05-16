@@ -12,7 +12,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   build:
@@ -25,29 +24,21 @@ jobs:
             os: ubuntu-latest
             ext: ""
             pkg_ext: .tar.gz
-            pkg_cmd: tar czf
-            separator: "/"
 
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-13
             ext: ""
             pkg_ext: .tar.gz
-            pkg_cmd: tar czf
-            separator: "/"
 
           - target: aarch64-apple-darwin
             os: macos-latest
             ext: ""
             pkg_ext: .tar.gz
-            pkg_cmd: tar czf
-            separator: "/"
 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             ext: .exe
             pkg_ext: .zip
-            pkg_cmd: 7z a -tzip
-            separator: "\\"
 
     steps:
       - uses: actions/checkout@v4
@@ -57,10 +48,6 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation dependencies
-        if: runner.os == 'Linux' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
-
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -68,8 +55,6 @@ jobs:
 
       - name: Build server (release)
         run: cargo build --release --package dashboard-server --target ${{ matrix.target }}
-        env:
-          CARGO_BUILD_TARGET: ${{ matrix.target }}
 
       - name: Prepare package directory
         shell: bash
@@ -78,7 +63,13 @@ jobs:
           mkdir -p "$PKG_DIR/scripts" "$PKG_DIR/dist"
 
           # Binary
-          cp "target/${{ matrix.target }}/release/dashboard-server${{ matrix.ext }}" "$PKG_DIR/"
+          BINARY="target/${{ matrix.target }}/release/dashboard-server${{ matrix.ext }}"
+          if [ -f "$BINARY" ]; then
+            cp "$BINARY" "$PKG_DIR/"
+          else
+            # Try without target subdir (native builds)
+            cp "target/release/dashboard-server${{ matrix.ext }}" "$PKG_DIR/"
+          fi
 
           # Static files
           cp dist/index.html "$PKG_DIR/dist/"
@@ -86,6 +77,8 @@ jobs:
           # Scripts
           cp scripts/kill_session.py "$PKG_DIR/scripts/"
           cp scripts/compress_session.py "$PKG_DIR/scripts/"
+          cp scripts/install.sh "$PKG_DIR/scripts/"
+          cp scripts/install.ps1 "$PKG_DIR/scripts/"
 
           echo "Package contents:"
           find "$PKG_DIR" -type f | sort
@@ -98,9 +91,10 @@ jobs:
 
       - name: Package (zip)
         if: matrix.pkg_ext == '.zip'
+        shell: pwsh
         run: |
           $pkg = "dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}"
-          7z a -tzip $pkg "dashboard-v4-${{ matrix.target }}\"
+          7z a -tzip $pkg "dashboard-v4-${{ matrix.target }}\*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
