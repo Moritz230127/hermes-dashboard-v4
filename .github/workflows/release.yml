@@ -98,6 +98,8 @@ jobs:
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
         with:
           name: dashboard-v4-${{ matrix.target }}
           path: dashboard-v4-${{ matrix.target }}${{ matrix.pkg_ext }}
