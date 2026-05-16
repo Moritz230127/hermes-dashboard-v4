@@ -212,7 +212,22 @@ hermes-dashboard-v4/
 
 ## 📸 截图
 
-> 仪表板包含：实时统计卡片、调用量趋势图、小时级热力图、会话列表、模型分布、API Key 状态
+| 深色主题 | 浅色主题 |
+|:--------:|:--------:|
+| ![深色主题](assets/screenshot-dark.png) | ![浅色主题](assets/screenshot-light.png) |
+
+> **深色主题**：显示 24h API 请求趋势、Token 用量、7 天 / 30 天统计、模型分布、API Key 池状态、运行中会话和告警。
+>
+> **浅色主题**：一键切换，展示同样的数据面板。
+
+### 环境说明
+
+> ⚠️ **免责声明**
+>
+> 本面板仅在 **Arch Linux (Wayland, niri)** 环境下经过完整测试。
+> **Windows** 和 **macOS** 为 CI 自动构建，未经人工验证。
+>
+> 如果你在 Windows / macOS 上遇到问题，欢迎提交 [Issue](https://github.com/Moritz230127/hermes-dashboard-v4/issues)。
 
 ---
 
